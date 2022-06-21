@@ -1,0 +1,2 @@
+server:
+  host: {{ env "SERVER_HOST" "google.com" }}
