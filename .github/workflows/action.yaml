@@ -9,7 +9,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v3
         with:
-          go-version-file: 'path/to/go.mod'
+          go-version-file: 'go.mod'
           check-latest: true
           cache: true
       - run: go run hello.go
