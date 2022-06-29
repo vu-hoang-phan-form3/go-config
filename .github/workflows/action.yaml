@@ -12,4 +12,4 @@ jobs:
           go-version-file: 'go.mod'
           check-latest: true
           cache: true
-      - run: go run hello.go
+      - run: go test ./... -cover
