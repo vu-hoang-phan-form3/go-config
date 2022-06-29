@@ -3,12 +3,18 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/vault/api"
-	"github.com/spf13/viper"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/hashicorp/vault/api"
+	"github.com/spf13/viper"
+)
+
+var (
+	SupportedExts = []string{"json", "yaml", "yml"}
 )
 
 type ConfigLoader struct {
@@ -45,26 +51,40 @@ func (cl *ConfigLoader) Viper() *viper.Viper {
 
 func (cl *ConfigLoader) LoadConfigFiles(fileNames ...string) error {
 	for _, fileName := range fileNames {
-		configType, err := getConfigType(fileName)
+		b, err := ioutil.ReadFile(fileName)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to read config file '%s': %w", fileName, err)
 		}
 
-		baseName := filepath.Base(fileName)
-		tmpl, err := template.New(baseName).Funcs(cl.funcMap).ParseFiles(fileName)
-		if err != nil {
-			return fmt.Errorf("failed to parse config file '%s': %w", fileName, err)
-		}
+		ext := filepath.Ext(fileName)
+		ext = strings.TrimPrefix(ext, ".")
 
-		buf := &bytes.Buffer{}
-		if err := tmpl.Execute(buf, nil); err != nil {
-			return fmt.Errorf("failed to render config file '%s': %w", fileName, err)
+		if err := cl.AppendConfig(string(b), ext); err != nil {
+			return fmt.Errorf("failed to append config file '%s': %w", fileName, err)
 		}
+	}
 
-		cl.viper.SetConfigType(configType)
-		if err := cl.viper.MergeConfig(buf); err != nil {
-			return fmt.Errorf("failed to merge config file '%s': %w", fileName, err)
-		}
+	return nil
+}
+
+func (cl *ConfigLoader) AppendConfig(config, configType string) error {
+	if err := checkConfigType(configType); err != nil {
+		return err
+	}
+
+	tmpl, err := template.New("").Funcs(cl.funcMap).Parse(config)
+	if err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	buf := &bytes.Buffer{}
+	if err := tmpl.Execute(buf, nil); err != nil {
+		return fmt.Errorf("failed to render config: %w", err)
+	}
+
+	cl.viper.SetConfigType(configType)
+	if err := cl.viper.MergeConfig(buf); err != nil {
+		return fmt.Errorf("failed to merge config: %w", err)
 	}
 
 	return nil
@@ -75,6 +95,10 @@ func (cl *ConfigLoader) Unmarshal(v interface{}) error {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 	return nil
+}
+
+func (cl *ConfigLoader) RegisterTemplateFunc(name string, fn interface{}) {
+	cl.funcMap[name] = fn
 }
 
 func (cl *ConfigLoader) env(envName string, defaultVal ...string) string {
@@ -104,13 +128,11 @@ func (cl *ConfigLoader) vault(path string, key string, defaultVal ...string) (st
 	return "", fmt.Errorf("vault: key '%s' does not exist in '%s' and no default value has been provided", key, path)
 }
 
-func getConfigType(fileName string) (string, error) {
-	ext := filepath.Ext(fileName)
-	ext = strings.TrimPrefix(ext, ".")
-	for _, supported := range viper.SupportedExts {
-		if ext == supported {
-			return ext, nil
+func checkConfigType(configType string) error {
+	for _, supported := range SupportedExts {
+		if configType == supported {
+			return nil
 		}
 	}
-	return "", viper.UnsupportedConfigError(ext)
+	return viper.UnsupportedConfigError(configType)
 }
