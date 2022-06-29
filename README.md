@@ -1,6 +1,6 @@
 # Go config
 
-Configure Go application with
+Customize config files with Go template, merge them and unmarshal into Go struct.
 
 ## Usage
 
