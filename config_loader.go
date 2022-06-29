@@ -21,6 +21,7 @@ type ConfigLoader struct {
 	funcMap     template.FuncMap
 	viper       *viper.Viper
 	vaultClient *api.Client
+	delimiters  []string
 }
 
 func NewConfigLoader(opts ...OptFunc) *ConfigLoader {
@@ -42,6 +43,12 @@ func WithVaultClient(vaultClient *api.Client) OptFunc {
 	return func(cl *ConfigLoader) {
 		cl.vaultClient = vaultClient
 		cl.funcMap["vault"] = cl.vault
+	}
+}
+
+func WithDelimiters(left, right string) OptFunc {
+	return func(cl *ConfigLoader) {
+		cl.delimiters = []string{left, right}
 	}
 }
 
@@ -72,7 +79,12 @@ func (cl *ConfigLoader) AppendConfig(config, configType string) error {
 		return err
 	}
 
-	tmpl, err := template.New("").Funcs(cl.funcMap).Parse(config)
+	tmpl := template.New("").Funcs(cl.funcMap)
+	if cl.delimiters != nil && len(cl.delimiters) == 2 {
+		tmpl = tmpl.Delims(cl.delimiters[0], cl.delimiters[1])
+	}
+
+	tmpl, err := tmpl.Parse(config)
 	if err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}

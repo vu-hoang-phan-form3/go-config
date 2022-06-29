@@ -186,6 +186,31 @@ b: {{ vault "secret/test" "B_VAL" "override_b_vault_default" }}
 				C: CType{Val: "default_c"},
 			},
 		},
+		{
+			"overrides with env custom delimiters",
+			[][]string{
+
+				// default json config
+				{defaultCfgJson, "json"},
+
+				// yaml config that overrides a with env, use [[ ]] as delimiters
+				{`
+a: [[ env "A_VAL" ]]
+`, "yaml",
+				},
+			},
+			func(*testing.T) (*ConfigLoader, CleanupFn) {
+				require.Nil(t, os.Setenv("A_VAL", "override_a_env"))
+				return NewConfigLoader(WithDelimiters("[[", "]]")), func() {
+					require.Nil(t, os.Unsetenv("A_VAL"))
+				}
+			},
+			Test{
+				A: "override_a_env",
+				B: "default_b",
+				C: CType{Val: "default_c"},
+			},
+		},
 	}
 
 	for _, test := range tests {
