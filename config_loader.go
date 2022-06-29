@@ -52,6 +52,12 @@ func WithDelimiters(left, right string) OptFunc {
 	}
 }
 
+func WithCustomTemplateFunc(name string, fn interface{}) OptFunc {
+	return func(cl *ConfigLoader) {
+		cl.funcMap[name] = fn
+	}
+}
+
 func (cl *ConfigLoader) Viper() *viper.Viper {
 	return cl.viper
 }
@@ -107,10 +113,6 @@ func (cl *ConfigLoader) Unmarshal(v interface{}) error {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 	return nil
-}
-
-func (cl *ConfigLoader) RegisterTemplateFunc(name string, fn interface{}) {
-	cl.funcMap[name] = fn
 }
 
 func (cl *ConfigLoader) env(envName string, defaultVal ...string) string {

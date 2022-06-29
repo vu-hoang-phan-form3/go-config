@@ -3,6 +3,7 @@ package main
 import (
 	"net"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/vault/api"
@@ -11,36 +12,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type Config struct {
-	Server   ServerCfg
-	Log      LogCfg
-	Database DatabaseCfg
+type CType struct {
+	Val string
 }
 
-type ServerCfg struct {
-	Host string
-	Port string
+type Test struct {
+	A string
+	B string
+	C CType
 }
 
-type LogCfg struct {
-	Level  string
-	Format string
-}
-
-type DatabaseCfg struct {
-	Postgres PostgresCfg
-	MongoDB  MongoDBCfg
-}
-
-type PostgresCfg struct {
-	ConnectionString string
-}
-
-type MongoDBCfg struct {
-	URL      string
-	Username string
-	Password string
-}
+type CleanupFn func()
 
 func initVault(t *testing.T) (net.Listener, *api.Client) {
 	t.Helper()
@@ -58,18 +40,6 @@ func initVault(t *testing.T) (net.Listener, *api.Client) {
 
 	return listener, client
 }
-
-type CType struct {
-	Val string
-}
-
-type Test struct {
-	A string
-	B string
-	C CType
-}
-
-type CleanupFn func()
 
 func TestConfigLoader_AppendConfig(t *testing.T) {
 
@@ -211,6 +181,28 @@ a: [[ env "A_VAL" ]]
 				C: CType{Val: "default_c"},
 			},
 		},
+		{
+			"overrides with custom template func",
+			[][]string{
+
+				// default json config
+				{defaultCfgJson, "json"},
+
+				// yaml config that overrides a with env, register strings.ToUpper as uppercase func in template
+				{`
+a: {{ uppercase "override_a" }}
+`, "yaml",
+				},
+			},
+			func(*testing.T) (*ConfigLoader, CleanupFn) {
+				return NewConfigLoader(WithCustomTemplateFunc("uppercase", strings.ToUpper)), func() {}
+			},
+			Test{
+				A: "OVERRIDE_A",
+				B: "default_b",
+				C: CType{Val: "default_c"},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -234,4 +226,28 @@ a: [[ env "A_VAL" ]]
 			require.Equal(t, test.expected, actual)
 		})
 	}
+}
+
+func TestConfigLoader_LoadConfigFiles(t *testing.T) {
+	require.Nil(t, os.Setenv("B_VAL", "override_b"))
+
+	cl := NewConfigLoader()
+	err := cl.LoadConfigFiles(
+		"tests/default.yaml",
+		"tests/override.json",
+	)
+	require.Nil(t, err)
+
+	var actual Test
+	err = cl.Unmarshal(&actual)
+	require.Nil(t, err)
+
+	expected := Test{
+		A: "default_a",
+		B: "override_b",
+		C: CType{
+			Val: "override_c",
+		},
+	}
+	require.Equal(t, expected, actual)
 }

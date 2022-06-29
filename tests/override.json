@@ -1,0 +1,6 @@
+{
+  "b": "{{ env "B_VAL" }}",
+  "c": {
+    "val": "override_c"
+  }
+}

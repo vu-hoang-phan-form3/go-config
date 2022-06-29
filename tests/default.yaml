@@ -1,15 +1,4 @@
-server:
-  host: localhost
-  port: 1234
-
-log:
-  level: debug
-  format: json
-
-database:
-  postgres:
-    connectionString: postgresql://localhost:5432
-  mongodb:
-    url: mongodb://mongodb0.example.com:27017
-    username: {{ env "MONGO_USERNAME" "user" }}
-    password: {{ env "MONGO_PASSWORD" }}
+a: default_a
+b: default_b
+c:
+  val: default_c
